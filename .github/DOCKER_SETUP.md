@@ -56,7 +56,7 @@ The workflow builds images for both:
 
 Your images will be available at:
 ```
-docker.io/<your-username>/postgres-replica
+docker.io/darkmatter08/postgres-replica
 ```
 
 ## Usage Examples
@@ -65,16 +65,16 @@ After the workflow runs successfully, you can pull and use the image:
 
 ```bash
 # Pull the latest image
-docker pull <your-username>/postgres-replica:latest
+docker pull darkmatter08/postgres-replica:latest
 
 # Pull a specific version
-docker pull <your-username>/postgres-replica:v1.0.0
+docker pull darkmatter08/postgres-replica:v1.0.0
 
 # Run the container
 docker run --rm \
   -v ./replication-config.yml:/config/replication-config.yml:ro \
   -p 3001:3000 \
-  <your-username>/postgres-replica:latest
+  darkmatter08/postgres-replica:latest
 ```
 
 ## Troubleshooting

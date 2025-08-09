@@ -1,0 +1,51 @@
+replication:
+  publication_name: "example_publication"
+  
+  # Source database (publisher)
+  source:
+    host: "source-db"
+    port: 5432
+    user: "sourceuser"
+    password: "sourcepass"
+    database: "sourcedb"
+  
+  # Target databases (subscribers)
+  targets:
+    - name: "primary_replica"
+      subscription_name: "primary_subscription"
+      host: "target-db-1"
+      port: 5432
+      user: "targetuser1"
+      password: "targetpass1"
+      database: "targetdb1"
+      settings:
+        enable_initial_sync: true
+        disable_triggers_during_sync: true
+      tables:
+        - "users"
+        - "posts"
+    
+    - name: "secondary_replica"
+      subscription_name: "secondary_subscription"
+      host: "target-db-2"
+      port: 5432
+      user: "targetuser2"
+      password: "targetpass2"
+      database: "targetdb2"
+      settings:
+        enable_initial_sync: true
+        disable_triggers_during_sync: true
+      tables:
+        - "users"  # Only replicate users table to secondary
+  
+  # Global default tables
+  tables:
+    - "users"
+    - "posts"
+  
+  # Global settings
+  settings:
+    max_wait_attempts: 30
+    wait_interval_seconds: 5
+    enable_initial_sync: true
+    disable_triggers_during_sync: true

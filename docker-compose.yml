@@ -1,0 +1,106 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Replication Service
+  postgres-replica:
+    image: darkmatter08/postgres-replica:latest
+    container_name: postgres-replica
+    volumes:
+      # Mount your configuration file
+      - ./replication-config.yml:/config/replication-config.yml:ro
+    environment:
+      # Optional: Specify config file path explicitly
+      CONFIG_FILE: '/config/replication-config.yml'
+      # Health check server port
+      PORT: 3000
+    ports:
+      - '3001:3000' # Health check endpoint
+    depends_on:
+      - source-db
+      - target-db-1
+      - target-db-2
+    restart: unless-stopped
+    networks:
+      - replica-network
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:3000/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Source Database (Publisher)
+  source-db:
+    image: postgres:15-alpine
+    container_name: postgres-source
+    environment:
+      POSTGRES_USER: sourceuser
+      POSTGRES_PASSWORD: sourcepass
+      POSTGRES_DB: sourcedb
+    ports:
+      - '5432:5432'
+    volumes:
+      - source_data:/var/lib/postgresql/data
+      - ./init-source.sql:/docker-entrypoint-initdb.d/init.sql
+    command: |
+      postgres 
+      -c wal_level=logical 
+      -c max_replication_slots=10 
+      -c max_wal_senders=10
+      -c shared_preload_libraries=''
+    networks:
+      - replica-network
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U sourceuser -d sourcedb']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Target Database 1 (Subscriber)
+  target-db-1:
+    image: postgres:15-alpine
+    container_name: postgres-target-1
+    environment:
+      POSTGRES_USER: targetuser1
+      POSTGRES_PASSWORD: targetpass1
+      POSTGRES_DB: targetdb1
+    ports:
+      - '5433:5432'
+    volumes:
+      - target1_data:/var/lib/postgresql/data
+    networks:
+      - replica-network
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U targetuser1 -d targetdb1']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Target Database 2 (Subscriber) - Optional additional target
+  target-db-2:
+    image: postgres:15-alpine
+    container_name: postgres-target-2
+    environment:
+      POSTGRES_USER: targetuser2
+      POSTGRES_PASSWORD: targetpass2
+      POSTGRES_DB: targetdb2
+    ports:
+      - '5434:5432'
+    volumes:
+      - target2_data:/var/lib/postgresql/data
+    networks:
+      - replica-network
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U targetuser2 -d targetdb2']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  source_data:
+  target1_data:
+  target2_data:
+
+networks:
+  replica-network:
+    driver: bridge

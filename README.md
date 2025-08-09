@@ -15,11 +15,13 @@ A Docker-based service for managing PostgreSQL logical replication between sourc
 
 A Docker-based service for managing PostgreSQL logical replication between source and target databases.
 
+🐳 **Docker Hub**: [`darkmatter08/postgres-replica`](https://hub.docker.com/r/darkmatter08/postgres-replica)
+
 ## Features
 
 - 🔄 **Multi-target replication**: Supports replication to multiple target databases
 - 📋 **File-based configuration**: Uses YAML configuration files with automatic discovery
-- 🐳 **Dockerized**: Ready-to-deploy Docker container
+- 🐳 **Dockerized**: Ready-to-deploy Docker container available on Docker Hub
 - 🔍 **Monitoring**: Built-in replication status monitoring
 - 🛡️ **Error handling**: Comprehensive error handling and graceful shutdown
 - 📊 **Logging**: Detailed logging for troubleshooting
@@ -37,38 +39,40 @@ The service reads its configuration from YAML files in the following order of pr
 
 ### Sample Configuration File
 
+The repository includes a complete example setup:
+- `replication-config.yml` - Example configuration
+- `docker-compose.yml` - Complete multi-database setup
+- `init-source.sql` - Sample database schema and data
+
 ```yaml
 replication:
-  publication_name: "my_publication"
+  publication_name: "example_publication"
   
   # Source database (publisher)
   source:
-    host: "postgres1"
+    host: "source-db"
     port: 5432
-    user: "user1"
-    password: "pass1"
-    database: "db1"
+    user: "sourceuser"
+    password: "sourcepass"
+    database: "sourcedb"
   
   # Target databases (subscribers)
   targets:
     - name: "primary_replica"
-      subscription_name: "my_subscription"
-      host: "postgres2"
+      subscription_name: "primary_subscription"
+      host: "target-db-1"
       port: 5432
-      user: "user2"
-      password: "pass2"
-      database: "db2"
+      user: "targetuser1"
+      password: "targetpass1"
+      database: "targetdb1"
       settings:
         enable_initial_sync: true
         disable_triggers_during_sync: true
-      tables:
-        - "User"
-        - "Post"
   
-  # Global default tables
+  # Tables to replicate
   tables:
-    - "User"
-    - "Post"
+    - "users"
+    - "posts"
   
   # Global settings
   settings:
@@ -80,64 +84,122 @@ replication:
 
 ## Usage
 
-### Option 1: Using Your Existing Config File
+### Option 1: Using Docker Image from Docker Hub
 
 ```bash
-cd postgres-replica
-
-# Build the image
-docker build -t postgres-replica .
+# Pull the latest image
+docker pull darkmatter08/postgres-replica:latest
 
 # Run with your config file
 docker run --rm \
   --name postgres-replica \
   -v "/path/to/your/replication-config.yml:/config/replication-config.yml:ro" \
   -p 3001:3000 \
-  postgres-replica
+  darkmatter08/postgres-replica:latest
 ```
 
-### Option 2: Quick Test with Sample Config
+### Option 2: Complete Docker Compose Setup
+
+Use the included `docker-compose.yml` for a complete setup with source and target databases:
 
 ```bash
+# Clone the repository
+git clone <your-repo-url>
 cd postgres-replica
-./scripts/test.sh
+
+# Start all services
+docker-compose up -d
+
+# Check logs
+docker-compose logs -f postgres-replica
+
+# Check health
+curl http://localhost:3001/health
 ```
 
-### Option 3: Integration with Your Project
+This will start:
+- Source PostgreSQL database (port 5432)
+- Two target PostgreSQL databases (ports 5433, 5434)
+- PostgreSQL replica service with health monitoring
 
-```bash
-cd postgres-replica
-./scripts/integrate.sh
-```
+### Option 3: Integration with Your Existing Project
 
-### Option 4: Using Docker Compose
+Add to your existing `docker-compose.yml`:
 
 ```yaml
 services:
   postgres-replica:
-    build: ./postgres-replica
+    image: darkmatter08/postgres-replica:latest
     volumes:
       - ./replication-config.yml:/config/replication-config.yml:ro
     ports:
       - "3001:3000"  # Health check endpoint
     depends_on:
-      - postgres1
-      - postgres2
+      - your-source-db
+      - your-target-db
     restart: unless-stopped
 ```
 
-## Configuration Discovery
+### Option 4: Building from Source
 
-The service automatically searches for configuration files in this order:
+```bash
+# Clone and build locally
+git clone <your-repo-url>
+cd postgres-replica
 
+# Build the image
+docker build -t postgres-replica .
+
+# Run with your config
+docker run --rm \
+  --name postgres-replica \
+  -v "./replication-config.yml:/config/replication-config.yml:ro" \
+  -p 3001:3000 \
+  postgres-replica
 ```
-📋 Configuration search order:
-1. $CONFIG_FILE (environment variable)
-2. /config/replication-config.yml (Docker volume)
-3. ./config/replication-config.yml (local config)
-4. ./replication-config.yml (current directory)
-5. ../replication-config.yml (parent directory)
-6. $REPLICATION_CONFIG (environment fallback)
+
+## Quick Start
+
+### 1. Using Docker Compose (Recommended)
+
+```bash
+# Clone the repository
+git clone <your-repo-url>
+cd postgres-replica
+
+# Start all services (source DB + target DBs + replication service)
+docker-compose up -d
+
+# Check the replication status
+curl http://localhost:3001/health
+
+# View logs
+docker-compose logs -f postgres-replica
+```
+
+### 2. Using Pre-built Docker Image
+
+```bash
+# Pull the image
+docker pull darkmatter08/postgres-replica:latest
+
+# Create your replication-config.yml (see sample below)
+# Then run:
+docker run --rm \
+  -v "./replication-config.yml:/config/replication-config.yml:ro" \
+  -p 3001:3000 \
+  darkmatter08/postgres-replica:latest
+```
+
+### 3. Health Monitoring
+
+Once running, monitor the service:
+```bash
+# Check overall health
+curl http://localhost:3001/health
+
+# Pretty print the JSON response
+curl -s http://localhost:3001/health | python -m json.tool
 ```
 
 ## Development

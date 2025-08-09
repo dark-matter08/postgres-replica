@@ -46,125 +46,159 @@ cd postgres-replica
 ./scripts/integrate.sh
 ```
 
-# 🚀 Quick Start Guide for postgres-replica
+# 🚀 Quick Start Guide
 
-## What we've created
+Get PostgreSQL replication running in under 5 minutes!
 
-A complete PostgreSQL replication service that can be built as a Docker image and configured via YAML files. The service handles:
+## Step 1: Clone the Repository
 
-- 🔄 **Multi-target replication**: One source database to multiple target databases
-- 📋 **File-based configuration**: Uses YAML files with automatic discovery
-- 🐳 **Dockerized**: Ready to deploy alongside your existing services
-- 🏥 **Health monitoring**: Built-in health check endpoint
-- 🛡️ **Error handling**: Comprehensive error handling and logging
-
-## Configuration File Locations
-
-The service automatically searches for configuration files in this order:
-
-1. `$CONFIG_FILE` environment variable path
-2. `/config/replication-config.yml` (Docker volume mount) ⭐ **Recommended**
-3. `./config/replication-config.yml` (local config directory)
-4. `./replication-config.yml` (current directory)
-5. `../replication-config.yml` (parent directory)
-6. `$REPLICATION_CONFIG` environment variable (fallback)
-
-## How to Use
-
-### Option 1: Quick Test
 ```bash
+git clone <your-repo-url>
 cd postgres-replica
-./scripts/test.sh
 ```
 
-### Option 2: Use Your Existing Config File
+## Step 2: Start Everything with Docker Compose
+
 ```bash
-cd postgres-replica
-
-# Build the image
-docker build -t postgres-replica .
-
-# Run with your config file
-docker run --rm 
-  --name postgres-replica 
-  -v "$(pwd)/../replication-config.yml:/config/replication-config.yml:ro" 
-  -p 3001:3000 
-  postgres-replica
+# This starts source DB, target DBs, and replication service
+docker-compose up -d
 ```
 
-### Option 3: Integration with Your Project
+This command will:
+- �️ Start a source PostgreSQL database with sample data
+- 🗄️ Start two target PostgreSQL databases  
+- � Start the replication service using `darkmatter08/postgres-replica:latest`
+- 📊 Set up logical replication between them
+
+## Step 3: Verify It's Working
+
 ```bash
-cd postgres-replica
-./scripts/integrate.sh
+# Check replication health
+curl http://localhost:3001/health
+
+# You should see something like:
+# {
+#   "status": "healthy",
+#   "details": {
+#     "source": { "status": "healthy" },
+#     "targets": [
+#       { "name": "primary_replica", "status": "healthy" },
+#       { "name": "secondary_replica", "status": "healthy" }
+#     ]
+#   }
+# }
 ```
 
-### Option 4: Add to Your Docker Compose
+## Step 4: Test the Replication
+
+```bash
+# Connect to source database and add data
+docker exec -it postgres-source psql -U sourceuser -d sourcedb
+
+# In the PostgreSQL prompt:
+INSERT INTO users (username, email, full_name) VALUES ('test_user', 'test@example.com', 'Test User');
+\q
+
+# Connect to target database and verify the data replicated
+docker exec -it postgres-target-1 psql -U targetuser1 -d targetdb1
+
+# In the PostgreSQL prompt:
+SELECT * FROM users WHERE username = 'test_user';
+# You should see the replicated data!
+\q
+```
+
+## What Just Happened?
+
+1. **Source Database** (`postgres-source`): Contains your original data
+2. **Target Databases** (`postgres-target-1`, `postgres-target-2`): Receive replicated data  
+3. **Replication Service** (`darkmatter08/postgres-replica`): Manages the logical replication
+
+## Docker Hub Image
+
+The service is available as a pre-built Docker image:
+
+```bash
+docker pull darkmatter08/postgres-replica:latest
+```
+
+🐳 **Docker Hub**: https://hub.docker.com/r/darkmatter08/postgres-replica
+
+## Customizing for Your Setup
+
+1. **Edit `replication-config.yml`** to match your database credentials
+2. **Modify `docker-compose.yml`** to use your existing databases
+3. **Update `init-source.sql`** with your actual database schema
+
+## Alternative: Use with Your Existing Databases
+
+If you already have PostgreSQL databases, just update the `replication-config.yml`:
 
 ```yaml
-services:
-  postgres-replica:
-    build: ./postgres-replica
-    volumes:
-      # Mount your existing config file
-      - ./replication-config.yml:/config/replication-config.yml:ro
-    ports:
-      - "3001:3000"  # Health check endpoint
-    depends_on:
-      - postgres1
-      - postgres2
-    restart: unless-stopped
+replication:
+  publication_name: "my_publication"
+  source:
+    host: "your-source-db-host"
+    port: 5432
+    user: "your-source-user"
+    password: "your-source-password"
+    database: "your-source-db"
+  targets:
+    - name: "your_target"
+      subscription_name: "your_subscription"
+      host: "your-target-db-host"
+      port: 5432
+      user: "your-target-user"
+      password: "your-target-password"
+      database: "your-target-db"
+  tables:
+    - "your_table_1"
+    - "your_table_2"
 ```
 
-## Environment Variables
-
-- `CONFIG_FILE`: Specific path to config file (optional)
-- `PORT`: Port for health check server (default: 3000)
-- `REPLICATION_CONFIG`: Fallback YAML/JSON config (backward compatibility)
-
-## Health Monitoring
-
-Once running, you can check the health status:
-
+Then run just the replication service:
 ```bash
-curl http://localhost:3001/health
+docker run --rm \
+  -v "./replication-config.yml:/config/replication-config.yml:ro" \
+  -p 3001:3000 \
+  darkmatter08/postgres-replica:latest
 ```
-
-This returns a JSON response with the status of:
-- Source database connection
-- Publication setup
-- Target database connections
-- Subscription status
-
-## Environment Variables
-
-- `REPLICATION_CONFIG`: Your replication configuration (YAML or JSON format)
-- `PORT`: Port for health check server (default: 3000)
-
-## What the Service Does
-
-1. **Reads configuration** from the `REPLICATION_CONFIG` environment variable
-2. **Connects to source database** and creates/verifies the publication
-3. **Connects to each target database** and creates/verifies subscriptions
-4. **Monitors replication status** continuously
-5. **Provides health check endpoint** for monitoring
-6. **Handles graceful shutdown** on SIGTERM/SIGINT
-
-## Key Features
-
-- ✅ **Zero-downtime deployment**: Can be stopped and restarted without affecting existing replication
-- ✅ **Multi-target support**: Replicate to multiple databases with different configurations
-- ✅ **Table filtering**: Configure which tables to replicate per target
-- ✅ **Error recovery**: Automatically handles connection failures and retries
-- ✅ **Logging**: Comprehensive logging with emojis for easy reading
-- ✅ **Security**: Runs as non-root user in Docker container
 
 ## Next Steps
 
-1. **Test the service** with your existing databases
-2. **Customize table schemas** in the `ensureTablesExist` method if needed
-3. **Add monitoring alerts** based on the health endpoint
-4. **Scale horizontally** by running multiple instances for different publication/subscription pairs
+- 📖 Read the full [README.md](README.md) for detailed configuration options
+- 🔧 Check out the [configuration examples](config/) for different setups
+- 🐳 Learn about [Docker Hub integration](.github/DOCKER_SETUP.md)
 
-## Need Help?
+## Troubleshooting
 
-Check the logs for detailed error messages and troubleshooting information. The service provides clear error messages and suggestions for common issues.
+If something isn't working:
+
+```bash
+# Check logs
+docker-compose logs postgres-replica
+
+# Check individual database logs
+docker-compose logs source-db
+docker-compose logs target-db-1
+
+# Stop and restart everything
+docker-compose down
+docker-compose up -d
+```
+
+**Common Issues:**
+- ❌ **Connection refused**: Check that databases are running (`docker-compose ps`)
+- ❌ **Permission denied**: Verify database credentials in `replication-config.yml`
+- ❌ **Tables not found**: Make sure your schema exists in both source and target databases
+
+## Production Deployment
+
+For production use:
+1. Use persistent volumes for your databases
+2. Set strong passwords and use secrets management
+3. Configure proper networking and firewalls
+4. Monitor the health endpoint (`/health`) with your monitoring system
+5. Set up log aggregation for troubleshooting
+
+That's it! You now have PostgreSQL logical replication running. 🎉
