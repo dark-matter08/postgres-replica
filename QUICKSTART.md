@@ -1,8 +1,45 @@
 # 🚀 Quick Start Guide for postgres-replica
 
-## What we've created
+## What we've createdThis command will:
+- 🗄️ Start a source PostgreSQL database (empty, you add your schema)
+- 🗄️ Start two target PostgreSQL databases (empty, you add matching schemas)
+- 🔄 Start the replication service using `darkmatter08/postgres-replica:latest`
+- 🔐 Configure proper networking and authentication
 
-A complete PostgreSQL replication service that can be built as a Docker image and configured via environment variables. The service handles:
+## Step 3: Set Up Your Database Schemas
+
+**Important**: The databases start empty. You need to create your schemas:
+
+```bash
+# Connect to source database and create your schema
+docker exec -it postgres-source psql -U sourceuser -d sourcedb
+
+# In PostgreSQL prompt, create your tables:
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+# Add some test data
+INSERT INTO users (username, email) VALUES ('testuser', 'test@example.com');
+\q
+
+# Connect to target databases and create the SAME schema (no data)
+docker exec -it postgres-target-1 psql -U targetuser1 -d targetdb1
+
+# Create the same table structure:
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+\q
+```
+
+## Step 4: Verify It's Workingplete PostgreSQL replication service that can be built as a Docker image and configured via environment variables. The service handles:
 
 - 🔄 **Multi-target replication**: One source database to multiple target databases
 - 📋 **Configuration-driven**: Uses your existing `replication-config.yml` file
@@ -89,32 +126,31 @@ curl http://localhost:3001/health
 # }
 ```
 
-## Step 4: Test the Replication
+## Step 5: Test the Replication
 
 ```bash
-# Connect to source database and add data
+# Add more data to source database
 docker exec -it postgres-source psql -U sourceuser -d sourcedb
 
 # In the PostgreSQL prompt:
-INSERT INTO users (username, email, full_name) VALUES ('test_user', 'test@example.com', 'Test User');
+INSERT INTO users (username, email) VALUES ('another_user', 'another@example.com');
 \q
 
 # Connect to target database and verify the data replicated
 docker exec -it postgres-target-1 psql -U targetuser1 -d targetdb1
 
 # In the PostgreSQL prompt:
-SELECT * FROM users WHERE username = 'test_user';
+SELECT * FROM users WHERE username = 'another_user';
 # You should see the replicated data!
 \q
 ```
 
 ## What Just Happened?
 
-1. **Source Database** (`postgres-source`): Contains your original data
-2. **Target Databases** (`postgres-target-1`, `postgres-target-2`): Receive replicated data  
+1. **Source Database** (`postgres-source`): Contains your original data and schema
+2. **Target Databases** (`postgres-target-1`, `postgres-target-2`): Receive replicated data (you create matching schemas)
 3. **Replication Service** (`darkmatter08/postgres-replica`): Manages the logical replication
-
-## Docker Hub Image
+4. **Network Configuration**: Proper pg_hba.conf files allow secure container communication## Docker Hub Image
 
 The service is available as a pre-built Docker image:
 
