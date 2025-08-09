@@ -101,8 +101,8 @@ export class ReplicationManager {
       // Get tables for this target (use target-specific or global)
       const tables = target.tables || this.config.replication.tables;
 
-      // Create tables if they don't exist (basic structure)
-      await this.ensureTablesExist(targetConnection, tables);
+      // Validate that all required tables exist in the target database
+      await this.validateTablesExist(targetConnection, tables);
 
       // Check if subscription already exists
       const checkResult = await targetConnection.query(
@@ -162,10 +162,16 @@ export class ReplicationManager {
     };
   }
 
-  private async ensureTablesExist(
+  private async validateTablesExist(
     connection: DatabaseConnection,
     tables: string[]
   ): Promise<void> {
+    console.log(
+      `🔍 Validating that required tables exist: ${tables.join(', ')}`
+    );
+
+    const missingTables: string[] = [];
+
     for (const table of tables) {
       try {
         // Check if table exists
@@ -175,46 +181,32 @@ export class ReplicationManager {
             WHERE table_schema = 'public' 
             AND table_name = $1
           )`,
-          [table.toLowerCase()]
+          [table]
         );
 
         if (!result.rows[0].exists) {
-          console.log(
-            `Table "${table}" does not exist in target database. Creating basic structure...`
-          );
-
-          // Create basic table structure based on common patterns
-          if (table.toLowerCase() === 'user') {
-            await connection.query(`
-              CREATE TABLE IF NOT EXISTS "User" (
-                id SERIAL PRIMARY KEY,
-                name VARCHAR(255),
-                email VARCHAR(255) UNIQUE,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-              )
-            `);
-          } else if (table.toLowerCase() === 'post') {
-            await connection.query(`
-              CREATE TABLE IF NOT EXISTS "Post" (
-                id SERIAL PRIMARY KEY,
-                title VARCHAR(255),
-                content TEXT,
-                "userId" INTEGER,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-              )
-            `);
-          } else {
-            // Generic table creation - you might want to customize this
-            console.warn(
-              `Unknown table "${table}". Please ensure it exists in the target database.`
-            );
-          }
+          missingTables.push(table);
+        } else {
+          console.log(`✅ Table "${table}" exists in target database`);
         }
       } catch (error) {
-        console.error(`Error checking/creating table "${table}":`, error);
-        // Continue with other tables even if one fails
+        console.error(`❌ Error checking table "${table}":`, error);
+        missingTables.push(table);
       }
     }
+
+    if (missingTables.length > 0) {
+      const errorMessage = `❌ Missing required tables in target database: ${missingTables.join(
+        ', '
+      )}. 
+Please ensure all tables exist in the target database before setting up replication.
+Tables must be created manually to ensure proper schema consistency.`;
+
+      console.error(errorMessage);
+      throw new Error(`Missing tables: ${missingTables.join(', ')}`);
+    }
+
+    console.log(`✅ All required tables exist in target database`);
   }
 
   async monitorReplication(): Promise<void> {
