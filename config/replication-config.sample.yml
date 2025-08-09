@@ -1,0 +1,54 @@
+# Sample PostgreSQL Replication Configuration
+# Copy this file and modify it for your setup
+
+replication:
+  publication_name: "my_publication"
+  
+  # Source database (publisher)
+  source:
+    host: "postgres1"
+    port: 5432
+    user: "user1"
+    password: "pass1"
+    database: "db1"
+  
+  # Target databases (subscribers)
+  targets:
+    - name: "primary_replica"
+      subscription_name: "my_subscription"
+      host: "postgres2"
+      port: 5432
+      user: "user2"
+      password: "pass2"
+      database: "db2"
+      settings:
+        enable_initial_sync: true
+        disable_triggers_during_sync: true
+      tables:
+        - "User"
+        - "Post"
+    
+    # Example of additional target
+    # - name: "analytics_replica"
+    #   subscription_name: "analytics_subscription"
+    #   host: "analytics-db"
+    #   port: 5432
+    #   user: "analytics_user"
+    #   password: "analytics_pass"
+    #   database: "analytics_db"
+    #   settings:
+    #     enable_initial_sync: false
+    #   tables:
+    #     - "User"  # Only replicate User table to analytics
+  
+  # Global default tables (used if target doesn't specify its own tables)
+  tables:
+    - "User"
+    - "Post"
+  
+  # Global settings (can be overridden per target)
+  settings:
+    max_wait_attempts: 30
+    wait_interval_seconds: 5
+    enable_initial_sync: true
+    disable_triggers_during_sync: true

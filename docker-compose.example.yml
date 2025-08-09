@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  postgres-replica:
+    build: .
+    volumes:
+      # Mount the config file from your project
+      - ../replication-config.yml:/config/replication-config.yml:ro
+    # Optional: You can still use environment variables as fallback
+    environment:
+      CONFIG_FILE: '/config/replication-config.yml'
+      # Fallback environment variable (optional)
+      # REPLICATION_CONFIG: |
+      #   replication:
+      #     publication_name: "my_publication"
+      #     # ... rest of config
+    ports:
+      - '3001:3000' # Health check endpoint
+    depends_on:
+      - postgres1
+      - postgres2
+    restart: unless-stopped
+    networks:
+      - replica-network
+
+  # Example source database
+  postgres1:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: user1
+      POSTGRES_PASSWORD: pass1
+      POSTGRES_DB: db1
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres1_data:/var/lib/postgresql/data
+    command: postgres -c wal_level=logical -c max_replication_slots=10 -c max_wal_senders=10
+    networks:
+      - replica-network
+
+  # Example target database
+  postgres2:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: user2
+      POSTGRES_PASSWORD: pass2
+      POSTGRES_DB: db2
+    ports:
+      - '5433:5432'
+    volumes:
+      - postgres2_data:/var/lib/postgresql/data
+    networks:
+      - replica-network
+
+volumes:
+  postgres1_data:
+  postgres2_data:
+
+networks:
+  replica-network:
+    driver: bridge
